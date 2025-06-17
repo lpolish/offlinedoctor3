@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use std::fs;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use reqwest;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
@@ -22,7 +22,7 @@ impl ModelManager {
     pub fn new(app_data_dir: PathBuf) -> Result<Self> {
         let models_dir = app_data_dir.join("models");
         fs::create_dir_all(&models_dir)?;
-        
+
         Ok(ModelManager { models_dir })
     }
 
@@ -63,19 +63,26 @@ impl ModelManager {
         self.models_dir.join(filename)
     }
 
-    pub async fn download_model(&self, model: &ModelInfo, progress_callback: Option<Box<dyn Fn(u64, u64) + Send>>) -> Result<PathBuf> {
+    pub async fn download_model(
+        &self,
+        model: &ModelInfo,
+        progress_callback: Option<Box<dyn Fn(u64, u64) + Send>>,
+    ) -> Result<PathBuf> {
         let model_path = self.models_dir.join(&model.filename);
-        
+
         if model_path.exists() {
             return Ok(model_path);
         }
 
         println!("Downloading model: {}", model.name);
-        
+
         let response = reqwest::get(&model.download_url).await?;
-        
+
         if !response.status().is_success() {
-            return Err(anyhow!("Failed to download model: HTTP {}", response.status()));
+            return Err(anyhow!(
+                "Failed to download model: HTTP {}",
+                response.status()
+            ));
         }
 
         let total_size = response.content_length().unwrap_or(0);
@@ -90,7 +97,7 @@ impl ModelManager {
             let chunk = chunk?;
             file.write_all(&chunk)?;
             downloaded += chunk.len() as u64;
-            
+
             if let Some(ref callback) = progress_callback {
                 callback(downloaded, total_size);
             }
@@ -118,6 +125,8 @@ impl ModelManager {
     pub fn get_default_model_path(&self) -> Option<PathBuf> {
         // Return the first downloaded model, prioritizing smaller ones first
         let downloaded = self.get_downloaded_models();
-        downloaded.first().map(|model| self.get_model_path(&model.filename))
+        downloaded
+            .first()
+            .map(|model| self.get_model_path(&model.filename))
     }
 }

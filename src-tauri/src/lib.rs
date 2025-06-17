@@ -2,12 +2,12 @@ mod ai_engine;
 mod database;
 mod model_manager;
 
+use ai_engine::{AIEngine, ChatMessage, ChatRequest, ChatResponse};
+use anyhow::Result;
+use database::{Conversation, Database};
+use model_manager::{ModelInfo, ModelManager};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
-use ai_engine::{AIEngine, ChatRequest, ChatResponse, ChatMessage};
-use database::{Database, Conversation};
-use model_manager::{ModelManager, ModelInfo};
-use anyhow::Result;
 
 // Application state
 pub struct AppState {
@@ -28,8 +28,8 @@ async fn initialize_app(app_handle: AppHandle) -> Result<String, String> {
 
     // Initialize database
     let db_path = app_data_dir.join("offline_doctor.db");
-    let database = Database::new(db_path)
-        .map_err(|e| format!("Failed to initialize database: {}", e))?;
+    let database =
+        Database::new(db_path).map_err(|e| format!("Failed to initialize database: {}", e))?;
 
     // Initialize model manager
     let model_manager = ModelManager::new(app_data_dir.clone())
@@ -50,7 +50,7 @@ async fn get_available_models(app_handle: AppHandle) -> Result<Vec<ModelInfo>, S
         let model_manager_guard = state.model_manager.lock().unwrap();
         model_manager_guard.clone()
     };
-    
+
     if let Some(model_manager) = model_manager {
         Ok(model_manager.get_available_models())
     } else {
@@ -61,19 +61,19 @@ async fn get_available_models(app_handle: AppHandle) -> Result<Vec<ModelInfo>, S
 #[tauri::command]
 async fn download_model(app_handle: AppHandle, model: ModelInfo) -> Result<String, String> {
     let state = app_handle.state::<AppState>();
-    
+
     // Clone the model manager to avoid holding the lock across await
     let model_manager = {
         let model_manager_guard = state.model_manager.lock().unwrap();
         model_manager_guard.clone()
     };
-    
+
     if let Some(model_manager) = model_manager {
         let model_path = model_manager
             .download_model(&model, None)
             .await
             .map_err(|e| format!("Failed to download model: {}", e))?;
-        
+
         Ok(format!("Model downloaded to: {}", model_path.display()))
     } else {
         Err("Model manager not initialized".to_string())
@@ -81,9 +81,12 @@ async fn download_model(app_handle: AppHandle, model: ModelInfo) -> Result<Strin
 }
 
 #[tauri::command]
-async fn initialize_ai_engine(app_handle: AppHandle, model_filename: String) -> Result<String, String> {
+async fn initialize_ai_engine(
+    app_handle: AppHandle,
+    model_filename: String,
+) -> Result<String, String> {
     let state = app_handle.state::<AppState>();
-    
+
     // Get model path without holding the lock
     let model_path = {
         let model_manager_guard = state.model_manager.lock().unwrap();
@@ -93,13 +96,13 @@ async fn initialize_ai_engine(app_handle: AppHandle, model_filename: String) -> 
             return Err("Model manager not initialized".to_string());
         }
     };
-    
+
     if !model_path.exists() {
         return Err(format!("Model file not found: {}", model_path.display()));
     }
 
     let ai_engine = AIEngine::new(model_path);
-    
+
     ai_engine
         .initialize()
         .await
@@ -107,14 +110,17 @@ async fn initialize_ai_engine(app_handle: AppHandle, model_filename: String) -> 
 
     // Now store the initialized engine
     *state.ai_engine.lock().unwrap() = Some(ai_engine);
-    
+
     Ok("AI engine initialized successfully".to_string())
 }
 
 #[tauri::command]
-async fn send_chat_message(app_handle: AppHandle, request: ChatRequest) -> Result<ChatResponse, String> {
+async fn send_chat_message(
+    app_handle: AppHandle,
+    request: ChatRequest,
+) -> Result<ChatResponse, String> {
     let state = app_handle.state::<AppState>();
-    
+
     // Get conversation ID or create new one
     let conversation_id = if let Some(id) = request.conversation_id {
         id
@@ -123,7 +129,7 @@ async fn send_chat_message(app_handle: AppHandle, request: ChatRequest) -> Resul
             let db_guard = state.database.lock().unwrap();
             db_guard.as_ref().cloned()
         };
-        
+
         if let Some(database) = database {
             let title = if request.message.len() > 50 {
                 format!("{}...", &request.message[..47])
@@ -144,7 +150,7 @@ async fn send_chat_message(app_handle: AppHandle, request: ChatRequest) -> Resul
             let db_guard = state.database.lock().unwrap();
             db_guard.as_ref().cloned()
         };
-        
+
         if let Some(database) = database {
             database
                 .add_message(&conversation_id, "user", &request.message)
@@ -160,7 +166,7 @@ async fn send_chat_message(app_handle: AppHandle, request: ChatRequest) -> Resul
             let db_guard = state.database.lock().unwrap();
             db_guard.as_ref().cloned()
         };
-        
+
         if let Some(database) = database {
             database
                 .get_conversation_messages(&conversation_id)
@@ -176,7 +182,7 @@ async fn send_chat_message(app_handle: AppHandle, request: ChatRequest) -> Resul
             let ai_guard = state.ai_engine.lock().unwrap();
             ai_guard.as_ref().cloned()
         };
-        
+
         if let Some(ai_engine) = ai_engine {
             ai_engine
                 .generate_response(&request.message, &conversation_history)
@@ -193,7 +199,7 @@ async fn send_chat_message(app_handle: AppHandle, request: ChatRequest) -> Resul
             let db_guard = state.database.lock().unwrap();
             db_guard.as_ref().cloned()
         };
-        
+
         if let Some(database) = database {
             database
                 .add_message(&conversation_id, "assistant", &ai_response)
@@ -217,7 +223,7 @@ async fn get_conversations(app_handle: AppHandle) -> Result<Vec<Conversation>, S
         let db_guard = state.database.lock().unwrap();
         db_guard.clone()
     };
-    
+
     if let Some(database) = database {
         database
             .get_conversations()
@@ -228,13 +234,16 @@ async fn get_conversations(app_handle: AppHandle) -> Result<Vec<Conversation>, S
 }
 
 #[tauri::command]
-async fn get_conversation_messages(app_handle: AppHandle, conversation_id: String) -> Result<Vec<ChatMessage>, String> {
+async fn get_conversation_messages(
+    app_handle: AppHandle,
+    conversation_id: String,
+) -> Result<Vec<ChatMessage>, String> {
     let state = app_handle.state::<AppState>();
     let database = {
         let db_guard = state.database.lock().unwrap();
         db_guard.clone()
     };
-    
+
     if let Some(database) = database {
         database
             .get_conversation_messages(&conversation_id)
@@ -245,13 +254,16 @@ async fn get_conversation_messages(app_handle: AppHandle, conversation_id: Strin
 }
 
 #[tauri::command]
-async fn delete_conversation(app_handle: AppHandle, conversation_id: String) -> Result<String, String> {
+async fn delete_conversation(
+    app_handle: AppHandle,
+    conversation_id: String,
+) -> Result<String, String> {
     let state = app_handle.state::<AppState>();
     let database = {
         let db_guard = state.database.lock().unwrap();
         db_guard.clone()
     };
-    
+
     if let Some(database) = database {
         database
             .delete_conversation(&conversation_id)
