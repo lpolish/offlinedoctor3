@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Result};
-use reqwest;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,9 +90,6 @@ impl ModelManager {
         let mut downloaded = 0u64;
         let mut file = fs::File::create(&model_path)?;
         let mut stream = response.bytes_stream();
-
-        use futures_util::StreamExt;
-        use std::io::Write;
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
