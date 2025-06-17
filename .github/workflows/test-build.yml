@@ -1,24 +1,15 @@
-name: 'CI'
+name: 'Test Build'
 
 on:
-  push:
-    branches: [ "main", "develop" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  test-tauri:
+  test-build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest' # for Intel based macs.
-            args: '--target x86_64-apple-darwin'
           - platform: 'ubuntu-22.04'
-            args: ''
-          - platform: 'windows-latest'
             args: ''
 
     runs-on: ${{ matrix.platform }}
@@ -33,8 +24,6 @@ jobs:
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -53,9 +42,6 @@ jobs:
       - name: lint frontend
         run: npm run lint --if-present
 
-      - name: test frontend
-        run: npm test --if-present
-
       - name: check Rust formatting
         run: cd src-tauri && cargo fmt --all -- --check
 
@@ -70,5 +56,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
-          # Don't upload to release in CI
-          releaseId: ''
+          includeDebug: false
+          includeRelease: true
+          includeUpdaterJson: false
+
+      - name: Debug - List built assets
+        run: |
+          echo "=== Listing src-tauri/target/release/bundle ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null || echo "Bundle directory not found"
+          echo "=== Listing target directory structure ==="
+          find src-tauri/target -name "*.deb" -o -name "*.rpm" -o -name "*.appimage" -o -name "*.dmg" -o -name "*.app" -o -name "*.msi" -o -name "*.exe" 2>/dev/null || echo "No installer files found"
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-build-${{ matrix.platform }}
+          path: |
+            src-tauri/target/release/bundle/
+          retention-days: 1

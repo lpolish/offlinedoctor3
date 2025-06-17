@@ -10,7 +10,7 @@ jobs:
   create-release:
     permissions:
       contents: write
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       release_id: ${{ steps.create-release.outputs.result }}
 
@@ -20,6 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          cache: 'npm'
       - name: get version
         run: echo "PACKAGE_VERSION=$(node -pe "require('./package.json').version")" >> $GITHUB_ENV
       - name: create release
@@ -50,7 +51,7 @@ jobs:
             args: '--target aarch64-apple-darwin'
           - platform: 'macos-latest' # for Intel based macs.
             args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-20.04' # for Tauri v1 you could also use ubuntu-18.04.
+          - platform: 'ubuntu-22.04' # Updated to newer Ubuntu
             args: ''
           - platform: 'windows-latest'
             args: ''
@@ -63,6 +64,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          cache: 'npm'
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -70,11 +72,16 @@ jobs:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up the linux/windows builds.
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
       - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-20.04'
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev pkg-config
 
       - name: install frontend dependencies
         run: npm install
@@ -85,11 +92,21 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+          includeDebug: false
+          includeRelease: true
+          includeUpdaterJson: false
+
+      - name: Debug - List built assets
+        run: |
+          echo "=== Listing src-tauri/target/release/bundle ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null || echo "Bundle directory not found"
+          echo "=== Listing target directory structure ==="
+          find src-tauri/target -name "*.deb" -o -name "*.rpm" -o -name "*.appimage" -o -name "*.dmg" -o -name "*.app" -o -name "*.msi" -o -name "*.exe" 2>/dev/null || echo "No installer files found"
 
   publish-release:
     permissions:
       contents: write
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [create-release, build-tauri]
 
     steps:
