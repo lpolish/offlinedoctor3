@@ -57,12 +57,31 @@ jobs:
           includeRelease: true
           includeUpdaterJson: false
 
-      - name: Debug - List built assets
+      - name: Debug - List built assets (Unix)
+        if: runner.os != 'Windows'
         run: |
           echo "=== Listing src-tauri/target/release/bundle ==="
           find src-tauri/target/release/bundle -type f 2>/dev/null || echo "Bundle directory not found"
           echo "=== Listing target directory structure ==="
           find src-tauri/target -name "*.deb" -o -name "*.rpm" -o -name "*.appimage" -o -name "*.dmg" -o -name "*.app" -o -name "*.msi" -o -name "*.exe" 2>/dev/null || echo "No installer files found"
+
+      - name: Debug - List built assets (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Write-Host "=== Listing src-tauri/target/release/bundle ==="
+          if (Test-Path "src-tauri/target/release/bundle") {
+            Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -File | Select-Object FullName
+          } else {
+            Write-Host "Bundle directory not found"
+          }
+          Write-Host "=== Listing target directory structure ==="
+          $files = Get-ChildItem -Path "src-tauri/target" -Recurse -File | Where-Object { $_.Extension -in @('.deb', '.rpm', '.appimage', '.dmg', '.app', '.msi', '.exe') }
+          if ($files) {
+            $files | Select-Object FullName
+          } else {
+            Write-Host "No installer files found"
+          }
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
