@@ -1,7 +1,7 @@
 # Offline Doctor AI
 
-[![CI](https://github.com/yourusername/offlinedoctor3/workflows/CI/badge.svg)](https://github.com/yourusername/offlinedoctor3/actions/workflows/ci.yml)
-[![Release](https://github.com/yourusername/offlinedoctor3/workflows/Release/badge.svg)](https://github.com/yourusername/offlinedoctor3/actions/workflows/release.yml)
+[![CI](https://github.com/lpolish/offlinedoctor3/workflows/CI/badge.svg)](https://github.com/lpolish/offlinedoctor3/actions/workflows/ci.yml)
+[![Release](https://github.com/lpolish/offlinedoctor3/workflows/Release/badge.svg)](https://github.com/lpolish/offlinedoctor3/actions/workflows/release.yml)
 [![Security](https://img.shields.io/badge/security-policy-blue)](SECURITY.md)
 
 A completely offline medical AI assistant designed for healthcare professionals, particularly resident doctors in remote locations. This application provides genuine AI-powered medical consultations without requiring an internet connection.
